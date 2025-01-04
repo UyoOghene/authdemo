@@ -39,7 +39,7 @@ app.post('/login', async(req,res)=>{
     const validPassword = await bcrypt.compare(password, user.password)
     if (validPassword){
         req.session.user_id = user._id;
-        res.send('yaay')
+        res.redirect('secret')
     }else{
         res.send('try again')
     }

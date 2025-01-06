@@ -4,7 +4,8 @@ const User = require('./models/user');
 const ejs = require('ejs');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
-const session = require('express-session')
+const session = require('express-session');
+const user = require('./models/user');
 
 
 // MongoDB Connection
@@ -25,6 +26,14 @@ app.use(session({
     resave: false,
     saveUninitialized: false
 }));
+
+const requireLogin =(req,res, next)=>{
+    if(!req.session.user_id){
+       return res.redirect('/login');
+    }
+    next();
+}
+
 app.get('/', (req,res)=>{
     res.send('homepage');
 })
@@ -33,24 +42,33 @@ app.get('/login', (req,res)=>{
     res.render('login');
 })
 
+// app.post('/login', async(req,res)=>{
+//     const { username, password} = req.body;
+//     const user = await User.findOne({username});
+//     const validPassword = await bcrypt.compare(password, user.password)
+//     if (validPassword){
+//         req.session.user_id = user._id;
+//         res.redirect('secret')
+//     }else{
+//         res.send('try again')
+//     }
+// })
+
+// Alternatively use this and add findAndValidate to user.js
 app.post('/login', async(req,res)=>{
     const { username, password} = req.body;
-    const user = await User.findOne({username});
-    const validPassword = await bcrypt.compare(password, user.password)
-    if (validPassword){
-        req.session.user_id = user._id;
+    const foundUser = await User.findAndValidate( username, password)
+    if (foundUser){
+        req.session.user_id = foundUser._id;
         res.redirect('secret')
     }else{
         res.send('try again')
     }
 })
 
-app.get('/secret', (req,res)=>{
-    if(req.session.user_id ){
-    res.send('you can only see me if you are logged in')
-}else{
-    res.redirect('login')
-}
+
+app.get('/secret', requireLogin,(req,res)=>{
+    res.render('secret')
 })
 
 app.get('/register', (req, res)=>{
@@ -58,15 +76,25 @@ app.get('/register', (req, res)=>{
 })
 app.post('/register', async (req, res)=>{
     const {password, username} = req.body;
-    const hash = await bcrypt.hash(password, 12);
-    const user = new User({
-        username,
-        password:hash
-    })
+    // const hash = await bcrypt.hash(password, 12);
+    // const user = new User({
+    //     username,
+    //     password:hash
+    // })
+
+    // alternately,instead of the hashing above , do the below and add pre(save) middleware to user.js
+    const user = new User({username, password})
     await user.save()
     req.session.user_id = user._id; ;
     res.redirect('/')
 })
+
+app.post('/logout',(req,res)=>{
+    req.session.user_id = null;
+    // req.session.destroy(); alternately use to clear everything in the session
+    res.redirect('login');
+})
+
 app.listen('3000', ()=>{
     console.log('serving at 3000')
 })
